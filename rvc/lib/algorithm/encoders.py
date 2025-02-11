@@ -33,13 +33,21 @@ class Encoder(torch.nn.Module):
         window_size: int = 10,
     ):
         super().__init__()
-
         self.hidden_channels = hidden_channels
+        self.filter_channels = filter_channels
+        self.n_heads = n_heads
         self.n_layers = n_layers
-        self.drop = torch.nn.Dropout(p_dropout)
+        self.kernel_size = kernel_size
+        self.p_dropout = p_dropout
+        self.window_size = window_size
 
-        self.attn_layers = torch.nn.ModuleList(
-            [
+        self.drop = torch.nn.Dropout(p_dropout)
+        self.attn_layers = torch.nn.ModuleList()
+        self.norm_layers_1 = torch.nn.ModuleList()
+        self.ffn_layers = torch.nn.ModuleList()
+        self.norm_layers_2 = torch.nn.ModuleList()
+        for i in range(self.n_layers):
+            self.attn_layers.append(
                 MultiHeadAttention(
                     hidden_channels,
                     hidden_channels,
@@ -47,14 +55,9 @@ class Encoder(torch.nn.Module):
                     p_dropout=p_dropout,
                     window_size=window_size,
                 )
-                for _ in range(n_layers)
-            ]
-        )
-        self.norm_layers_1 = torch.nn.ModuleList(
-            [LayerNorm(hidden_channels) for _ in range(n_layers)]
-        )
-        self.ffn_layers = torch.nn.ModuleList(
-            [
+            )
+            self.norm_layers_1.append(LayerNorm(hidden_channels))
+            self.ffn_layers.append(
                 FFN(
                     hidden_channels,
                     hidden_channels,
@@ -62,12 +65,8 @@ class Encoder(torch.nn.Module):
                     kernel_size,
                     p_dropout=p_dropout,
                 )
-                for _ in range(n_layers)
-            ]
-        )
-        self.norm_layers_2 = torch.nn.ModuleList(
-            [LayerNorm(hidden_channels) for _ in range(n_layers)]
-        )
+            )
+            self.norm_layers_2.append(LayerNorm(hidden_channels))
 
     def forward(self, x, x_mask):
         attn_mask = x_mask.unsqueeze(2) * x_mask.unsqueeze(-1)
@@ -86,8 +85,7 @@ class Encoder(torch.nn.Module):
 
 
 class TextEncoder(torch.nn.Module):
-    """
-    Text Encoder with configurable embedding dimension.
+    """Text Encoder with configurable embedding dimension.
 
     Args:
         out_channels (int): Output channels of the encoder.
@@ -113,31 +111,40 @@ class TextEncoder(torch.nn.Module):
         embedding_dim: int,
         f0: bool = True,
     ):
-        super().__init__()
-        self.hidden_channels = hidden_channels
+        super(TextEncoder, self).__init__()
         self.out_channels = out_channels
+        self.hidden_channels = hidden_channels
+        self.filter_channels = filter_channels
+        self.n_heads = n_heads
+        self.n_layers = n_layers
+        self.kernel_size = kernel_size
+        self.p_dropout = float(p_dropout)
         self.emb_phone = torch.nn.Linear(embedding_dim, hidden_channels)
         self.lrelu = torch.nn.LeakyReLU(0.1, inplace=True)
-        self.emb_pitch = torch.nn.Embedding(256, hidden_channels) if f0 else None
-
+        if f0:
+            self.emb_pitch = torch.nn.Embedding(256, hidden_channels)
         self.encoder = Encoder(
-            hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout
+            hidden_channels,
+            filter_channels,
+            n_heads,
+            n_layers,
+            kernel_size,
+            float(p_dropout),
         )
         self.proj = torch.nn.Conv1d(hidden_channels, out_channels * 2, 1)
 
     def forward(
         self, phone: torch.Tensor, pitch: Optional[torch.Tensor], lengths: torch.Tensor
     ):
-        x = self.emb_phone(phone)
-        if pitch is not None and self.emb_pitch:
-            x += self.emb_pitch(pitch)
-
-        x *= math.sqrt(self.hidden_channels)
+        if pitch is None:
+            x = self.emb_phone(phone)
+        else:
+            x = self.emb_phone(phone) + self.emb_pitch(pitch)
+        x = x * math.sqrt(self.hidden_channels)  # [b, t, h]
         x = self.lrelu(x)
-        x = x.transpose(1, -1)  # [B, H, T]
-
-        x_mask = sequence_mask(lengths, x.size(2)).unsqueeze(1).to(x.dtype)
-        x = self.encoder(x, x_mask)
+        x = torch.transpose(x, 1, -1)  # [b, h, t]
+        x_mask = torch.unsqueeze(sequence_mask(lengths, x.size(2)), 1).to(x.dtype)
+        x = self.encoder(x * x_mask, x_mask)
         stats = self.proj(x) * x_mask
 
         m, logs = torch.split(stats, self.out_channels, dim=1)
@@ -145,8 +152,7 @@ class TextEncoder(torch.nn.Module):
 
 
 class PosteriorEncoder(torch.nn.Module):
-    """
-    Posterior Encoder for inferring latent representation.
+    """Posterior Encoder for inferring latent representation.
 
     Args:
         in_channels (int): Number of channels in the input.
@@ -168,8 +174,15 @@ class PosteriorEncoder(torch.nn.Module):
         n_layers: int,
         gin_channels: int = 0,
     ):
-        super().__init__()
+        super(PosteriorEncoder, self).__init__()
+        self.in_channels = in_channels
         self.out_channels = out_channels
+        self.hidden_channels = hidden_channels
+        self.kernel_size = kernel_size
+        self.dilation_rate = dilation_rate
+        self.n_layers = n_layers
+        self.gin_channels = gin_channels
+
         self.pre = torch.nn.Conv1d(in_channels, hidden_channels, 1)
         self.enc = WaveNet(
             hidden_channels,
@@ -183,7 +196,7 @@ class PosteriorEncoder(torch.nn.Module):
     def forward(
         self, x: torch.Tensor, x_lengths: torch.Tensor, g: Optional[torch.Tensor] = None
     ):
-        x_mask = sequence_mask(x_lengths, x.size(2)).unsqueeze(1).to(x.dtype)
+        x_mask = torch.unsqueeze(sequence_mask(x_lengths, x.size(2)), 1).to(x.dtype)
 
         x = self.pre(x) * x_mask
         x = self.enc(x, x_mask, g=g)
@@ -191,15 +204,18 @@ class PosteriorEncoder(torch.nn.Module):
         stats = self.proj(x) * x_mask
         m, logs = torch.split(stats, self.out_channels, dim=1)
 
-        z = m + torch.randn_like(m) * torch.exp(logs)
-        z *= x_mask
+        logs_exp = torch.exp(logs)
+        z = m + torch.randn_like(m) * logs_exp
+        z = z * x_mask
 
         return z, m, logs, x_mask
 
     def remove_weight_norm(self):
+        """Removes weight normalization from the encoder."""
         self.enc.remove_weight_norm()
 
     def __prepare_scriptable__(self):
+        """Prepares the module for scripting."""
         for hook in self.enc._forward_pre_hooks.values():
             if (
                 hook.__module__ == "torch.nn.utils.parametrizations.weight_norm"

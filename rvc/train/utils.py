@@ -2,7 +2,7 @@ import os
 import glob
 import torch
 import numpy as np
-import soundfile as sf
+from scipy.io.wavfile import read
 from collections import OrderedDict
 import matplotlib.pyplot as plt
 
@@ -45,7 +45,7 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, load_opt=1):
         checkpoint_path
     ), f"Checkpoint file not found: {checkpoint_path}"
 
-    checkpoint_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+    checkpoint_dict = torch.load(checkpoint_path, map_location="cpu")
     checkpoint_dict = replace_keys_in_dict(
         replace_keys_in_dict(
             checkpoint_dict, ".weight_v", ".parametrizations.weight.original1"
@@ -102,19 +102,20 @@ def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path)
         "optimizer": optimizer.state_dict(),
         "learning_rate": learning_rate,
     }
+    torch.save(checkpoint_data, checkpoint_path)
 
     # Create a backwards-compatible checkpoint
-    torch.save(
+    old_version_path = checkpoint_path.replace(".pth", "_old_version.pth")
+    checkpoint_data = replace_keys_in_dict(
         replace_keys_in_dict(
-            replace_keys_in_dict(
-                checkpoint_data, ".parametrizations.weight.original1", ".weight_v"
-            ),
-            ".parametrizations.weight.original0",
-            ".weight_g",
+            checkpoint_data, ".parametrizations.weight.original1", ".weight_v"
         ),
-        checkpoint_path,
+        ".parametrizations.weight.original0",
+        ".weight_g",
     )
+    torch.save(checkpoint_data, old_version_path)
 
+    os.replace(old_version_path, checkpoint_path)
     print(f"Saved model '{checkpoint_path}' (epoch {iteration})")
 
 
@@ -197,8 +198,8 @@ def load_wav_to_torch(full_path):
     Args:
         full_path (str): The path to the WAV file.
     """
-    data, sample_rate = sf.read(full_path, dtype="float32")
-    return torch.FloatTensor(data), sample_rate
+    sample_rate, data = read(full_path)
+    return torch.FloatTensor(data.astype(np.float32)), sample_rate
 
 
 def load_filepaths_and_text(filename, split="|"):

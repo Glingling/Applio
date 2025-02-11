@@ -5,10 +5,35 @@ import requests
 
 url_base = "https://huggingface.co/IAHispano/Applio/resolve/main/Resources"
 
-pretraineds_hifigan_list = [
+pretraineds_v1_list = [
+    (
+        "pretrained_v1/",
+        [
+            "D32k.pth",
+            "D40k.pth",
+            "D48k.pth",
+            "G32k.pth",
+            "G40k.pth",
+            "G48k.pth",
+            "f0D32k.pth",
+            "f0D40k.pth",
+            "f0D48k.pth",
+            "f0G32k.pth",
+            "f0G40k.pth",
+            "f0G48k.pth",
+        ],
+    )
+]
+pretraineds_v2_list = [
     (
         "pretrained_v2/",
         [
+            "D32k.pth",
+            "D40k.pth",
+            "D48k.pth",
+            "G32k.pth",
+            "G40k.pth",
+            "G48k.pth",
             "f0D32k.pth",
             "f0D40k.pth",
             "f0D48k.pth",
@@ -25,7 +50,8 @@ executables_list = [
 ]
 
 folder_mapping_list = {
-    "pretrained_v2/": "rvc/models/pretraineds/hifi-gan/",
+    "pretrained_v1/": "rvc/models/pretraineds/pretrained_v1/",
+    "pretrained_v2/": "rvc/models/pretraineds/pretrained_v2/",
     "embedders/contentvec/": "rvc/models/embedders/contentvec/",
     "predictors/": "rvc/models/predictors/",
     "formant/": "rvc/models/formant/",
@@ -100,11 +126,19 @@ def split_pretraineds(pretrained_list):
     return f0_list, non_f0_list
 
 
-pretraineds_hifigan_list, _ = split_pretraineds(pretraineds_hifigan_list)
+pretraineds_v1_f0_list, pretraineds_v1_nof0_list = split_pretraineds(
+    pretraineds_v1_list
+)
+pretraineds_v2_f0_list, pretraineds_v2_nof0_list = split_pretraineds(
+    pretraineds_v2_list
+)
 
 
 def calculate_total_size(
-    pretraineds_hifigan,
+    pretraineds_v1_f0,
+    pretraineds_v1_nof0,
+    pretraineds_v2_f0,
+    pretraineds_v2_nof0,
     models,
     exe,
 ):
@@ -117,12 +151,18 @@ def calculate_total_size(
         total_size += get_file_size_if_missing(embedders_list)
     if exe and os.name == "nt":
         total_size += get_file_size_if_missing(executables_list)
-    total_size += get_file_size_if_missing(pretraineds_hifigan)
+    total_size += get_file_size_if_missing(pretraineds_v1_f0)
+    total_size += get_file_size_if_missing(pretraineds_v1_nof0)
+    total_size += get_file_size_if_missing(pretraineds_v2_f0)
+    total_size += get_file_size_if_missing(pretraineds_v2_nof0)
     return total_size
 
 
 def prequisites_download_pipeline(
-    pretraineds_hifigan,
+    pretraineds_v1_f0,
+    pretraineds_v1_nof0,
+    pretraineds_v2_f0,
+    pretraineds_v2_nof0,
     models,
     exe,
 ):
@@ -130,7 +170,10 @@ def prequisites_download_pipeline(
     Manage the download pipeline for different categories of files.
     """
     total_size = calculate_total_size(
-        pretraineds_hifigan_list if pretraineds_hifigan else [],
+        pretraineds_v1_f0_list if pretraineds_v1_f0 else [],
+        pretraineds_v1_nof0_list if pretraineds_v1_nof0 else [],
+        pretraineds_v2_f0_list if pretraineds_v2_f0 else [],
+        pretraineds_v2_nof0_list if pretraineds_v2_nof0 else [],
         models,
         exe,
     )
@@ -147,7 +190,13 @@ def prequisites_download_pipeline(
                     download_mapping_files(executables_list, global_bar)
                 else:
                     print("No executables needed")
-            if pretraineds_hifigan:
-                download_mapping_files(pretraineds_hifigan_list, global_bar)
+            if pretraineds_v1_f0:
+                download_mapping_files(pretraineds_v1_f0_list, global_bar)
+            if pretraineds_v1_nof0:
+                download_mapping_files(pretraineds_v1_nof0_list, global_bar)
+            if pretraineds_v2_f0:
+                download_mapping_files(pretraineds_v2_f0_list, global_bar)
+            if pretraineds_v2_nof0:
+                download_mapping_files(pretraineds_v2_nof0_list, global_bar)
     else:
         pass

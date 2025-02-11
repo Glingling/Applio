@@ -6,9 +6,10 @@
   "plugins": [],
   "discord_presence": true,
   "lang": {
-    "override": false,
-    "selected_lang": "en_US"
+    "override": true,
+    "selected_lang": "fr_FR"
   },
+  "flask_server": false,
   "version": "3.2.8-bugfix",
   "model_author": "None"
 }

@@ -3,9 +3,7 @@ import sys
 import os
 import logging
 
-from typing import Any
-
-DEFAULT_SERVER_NAME = "127.0.0.1"
+# Constants
 DEFAULT_PORT = 6969
 MAX_PORT_ATTEMPTS = 10
 
@@ -35,7 +33,10 @@ from tabs.settings.settings import settings_tab
 from core import run_prerequisites_script
 
 run_prerequisites_script(
-    pretraineds_hifigan=True,
+    pretraineds_v1_f0=False,
+    pretraineds_v1_nof0=False,
+    pretraineds_v2_f0=True,
+    pretraineds_v2_nof0=False,
     models=True,
     exe=True,
 )
@@ -58,6 +59,13 @@ import assets.installation_checker as installation_checker
 
 installation_checker.check_installation()
 
+# Start Flask server if enabled
+from assets.flask.server import start_flask, load_config_flask
+
+if load_config_flask():
+    print("Starting Flask server")
+    start_flask()
+
 # Load theme
 import assets.themes.loadThemes as loadThemes
 
@@ -75,7 +83,7 @@ with gr.Blocks(
     )
     gr.Markdown(
         i18n(
-            "[Support](https://discord.gg/urxFjYmYYh) — [GitHub](https://github.com/IAHispano/Applio)"
+            "[Support](https://discord.gg/urxFjYmYYh) — [Discord Bot](https://discord.com/oauth2/authorize?client_id=1144714449563955302&permissions=1376674695271&scope=bot%20applications.commands) — [GitHub](https://github.com/IAHispano/Applio)"
         )
     )
     with gr.Tab(i18n("Inference")):
@@ -105,40 +113,29 @@ with gr.Blocks(
     with gr.Tab(i18n("Settings")):
         settings_tab()
 
-    gr.Markdown(
-        """
-    <div style="text-align: center; font-size: 0.9em; text-color: a3a3a3;">
-    By using Applio, you agree to comply with ethical and legal standards, respect intellectual property and privacy rights, avoid harmful or prohibited uses, and accept full responsibility for any outcomes, while Applio disclaims liability and reserves the right to amend these terms.
-    </div>
-    """
-    )
 
-
-def launch_gradio(server_name: str, server_port: int) -> None:
+def launch_gradio(port):
     Applio.launch(
         favicon_path="assets/ICON.ico",
         share="--share" in sys.argv,
         inbrowser="--open" in sys.argv,
-        server_name=server_name,
-        server_port=server_port,
+        server_port=port,
     )
 
 
-def get_value_from_args(key: str, default: Any = None) -> Any:
-    if key in sys.argv:
-        index = sys.argv.index(key) + 1
-        if index < len(sys.argv):
-            return sys.argv[index]
-    return default
+def get_port_from_args():
+    if "--port" in sys.argv:
+        port_index = sys.argv.index("--port") + 1
+        if port_index < len(sys.argv):
+            return int(sys.argv[port_index])
+    return DEFAULT_PORT
 
 
 if __name__ == "__main__":
-    port = int(get_value_from_args("--port", DEFAULT_PORT))
-    server = get_value_from_args("--server-name", DEFAULT_SERVER_NAME)
-
+    port = get_port_from_args()
     for _ in range(MAX_PORT_ATTEMPTS):
         try:
-            launch_gradio(server, port)
+            launch_gradio(port)
             break
         except OSError:
             print(

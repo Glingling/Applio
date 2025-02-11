@@ -62,8 +62,6 @@ names = [
     )
 ]
 
-default_weight = names[0] if names else None
-
 indexes_list = [
     os.path.join(root, name)
     for root, _, files in os.walk(model_root_relative, topdown=False)
@@ -241,15 +239,6 @@ def get_indexes():
     return indexes_list if indexes_list else ""
 
 
-def extract_model_and_epoch(path):
-    base_name = os.path.basename(path)
-    match = re.match(r"(.+?)_(\d+)e_", base_name)
-    if match:
-        model, epoch = match.groups()
-        return model, int(epoch)
-    return "", 0
-
-
 def save_to_wav(record_button):
     if record_button is None:
         pass
@@ -303,25 +292,18 @@ def create_folder_and_move_files(folder_name, bin_file, config_file):
     if not folder_name:
         return "Folder name must not be empty."
 
-    folder_name = os.path.basename(folder_name)
-    target_folder = os.path.join(custom_embedder_root, folder_name)
-
-    normalized_target_folder = os.path.abspath(target_folder)
-    normalized_custom_embedder_root = os.path.abspath(custom_embedder_root)
-
-    if not normalized_target_folder.startswith(normalized_custom_embedder_root):
-        return "Invalid folder name. Folder must be within the custom embedder root directory."
-
-    os.makedirs(target_folder, exist_ok=True)
+    folder_name = os.path.join(custom_embedder_root, folder_name)
+    os.makedirs(folder_name, exist_ok=True)
 
     if bin_file:
-        shutil.copy(bin_file, os.path.join(target_folder, os.path.basename(bin_file)))
-    if config_file:
-        shutil.copy(
-            config_file, os.path.join(target_folder, os.path.basename(config_file))
-        )
+        bin_file_path = os.path.join(folder_name, os.path.basename(bin_file))
+        shutil.copy(bin_file, bin_file_path)
 
-    return f"Files moved to folder {target_folder}"
+    if config_file:
+        config_file_path = os.path.join(folder_name, os.path.basename(config_file))
+        shutil.copy(config_file, config_file_path)
+
+    return f"Files moved to folder {folder_name}"
 
 
 def refresh_formant():
@@ -341,9 +323,7 @@ def refresh_embedders_folders():
 def get_speakers_id(model):
     if model:
         try:
-            model_data = torch.load(
-                os.path.join(now_dir, model), map_location="cpu", weights_only=True
-            )
+            model_data = torch.load(os.path.join(now_dir, model), map_location="cpu")
             speakers_id = model_data.get("speakers_id")
             if speakers_id:
                 return list(range(speakers_id))
@@ -357,12 +337,13 @@ def get_speakers_id(model):
 
 # Inference tab
 def inference_tab():
+    default_weight = names[0] if names else None
     with gr.Column():
         with gr.Row():
             model_file = gr.Dropdown(
                 label=i18n("Voice Model"),
                 info=i18n("Select the voice model to use for the conversion."),
-                choices=sorted(names, key=lambda x: extract_model_and_epoch(x)),
+                choices=sorted(names, key=lambda path: os.path.getsize(path)),
                 interactive=True,
                 value=default_weight,
                 allow_custom_value=True,
