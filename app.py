@@ -31,6 +31,7 @@ from tabs.settings.settings import settings_tab
 
 # Run prerequisites
 from core import run_prerequisites_script
+from api import run_api
 
 run_prerequisites_script(
     pretraineds_v1_f0=False,
@@ -130,18 +131,25 @@ def get_port_from_args():
             return int(sys.argv[port_index])
     return DEFAULT_PORT
 
+def launch_api():
+    print('Launch API')
+    run_api()
 
 if __name__ == "__main__":
-    port = get_port_from_args()
-    for _ in range(MAX_PORT_ATTEMPTS):
-        try:
-            launch_gradio(port)
-            break
-        except OSError:
-            print(
-                f"Failed to launch on port {port}, trying again on port {port - 1}..."
-            )
-            port -= 1
-        except Exception as error:
-            print(f"An error occurred launching Gradio: {error}")
-            break
+    print(sys.argv)
+    if "--api" in sys.argv:
+        run_api()
+    else :
+        port = get_port_from_args()
+        for _ in range(MAX_PORT_ATTEMPTS):
+            try:
+                launch_gradio(port)
+                break
+            except OSError:
+                print(
+                    f"Failed to launch on port {port}, trying again on port {port - 1}..."
+                )
+                port -= 1
+            except Exception as error:
+                print(f"An error occurred launching Gradio: {error}")
+                break

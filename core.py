@@ -349,7 +349,6 @@ def run_tts_script(
     embedder_model_custom: str = None,
     sid: int = 0,
 ):
-
     tts_script_path = os.path.join("rvc", "lib", "tools", "tts.py")
 
     if os.path.exists(output_tts_path):
@@ -369,6 +368,31 @@ def run_tts_script(
             ],
         ),
     ]
+    print("tts_file",tts_file)
+    print("tts_text",tts_text)
+    print("tts_voice",tts_voice)
+    print("tts_rate",tts_rate)
+    print("pitch",pitch)
+    print("filter_radius",filter_radius)
+    print("index_rate",index_rate)
+    print("volume_envelope",volume_envelope)
+    print("protect",protect)
+    print("hop_length",hop_length)
+    print("f0_method",f0_method)
+    print("output_tts_path",output_tts_path)
+    print("output_rvc_path",output_rvc_path)
+    print("pth_path",pth_path)
+    print("index_path",index_path)
+    print("split_audio",split_audio)
+    print("f0_autotune",f0_autotune)
+    print("f0_autotune_strength",f0_autotune_strength)
+    print("clean_audio",clean_audio)
+    print("clean_strength",clean_strength)
+    print("export_format",export_format)
+    print("f0_file",f0_file)
+    print("embedder_model",embedder_model)
+    print("embedder_model_custom",embedder_model_custom)
+    print("sid",sid)
     subprocess.run(command_tts)
     infer_pipeline = import_voice_converter()
     infer_pipeline.convert_audio(
