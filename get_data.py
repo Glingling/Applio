@@ -1,6 +1,5 @@
- import requests
-import json
-from typing import Optional, List, Dict
+import requests
+from typing import List, Dict
 import time
 
 class NotionTextExtractor:
@@ -149,7 +148,7 @@ def get_task_result(task_id: str):
     response = requests.get(url)
 
     if response.status_code == 200:
-        return response.json()
+        return response
     else:
         raise Exception(f"Erreur lors de la récupération du résultat: {response.text}")
 
