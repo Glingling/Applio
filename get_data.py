@@ -164,7 +164,7 @@ def delete_task(task_id: str):
     else:
         raise Exception(f"Erreur lors de la suppression de la tâche: {response.text}")
 
-def wait_for_task_completion(task_id: str, check_interval: int = 5, timeout: int = 300):
+def wait_for_task_completion(task_id: str, check_interval: int = 5, timeout: int = 600):
     """
     Attend que la tâche soit terminée avec un timeout
     """
@@ -182,16 +182,6 @@ def wait_for_task_completion(task_id: str, check_interval: int = 5, timeout: int
         time.sleep(check_interval)
 
 def get_child_pages(pages, extractor, search_query):
-    for i, page in enumerate(pages, 1):
-        print(
-            page.get("properties", {}).get("title", [{"plain_text": "Sans titre"}])[
-                "title"
-            ][0]
-        )
-        print(
-            f"{i}. {page.get('properties', {}).get('title', [{'plain_text': 'Sans titre'}])['title'][0]['plain_text']}"
-        )
-
     for page in pages:
         if (
             page.get("properties", {}).get("title", [{"plain_text": "Sans titre"}])[
@@ -221,7 +211,6 @@ def get_child_pages(pages, extractor, search_query):
                 'titre': f"{search_query}_{child['title']}",
                 'content': content
             })
-        print(all_content)
     else:
         print("\nAucune page enfant trouvée.")
 
@@ -231,10 +220,8 @@ def use_appolo(child_content):
     # Utilisation simple
     task_id = start_tts_task(child_content["content"])
     result = wait_for_task_completion(task_id)
-    print(result)
     result = get_task_result(task_id)
     open(f"{child_content['titre']}.wav", 'wb').write(result.content)
-    print(result)
     delete_task(task_id)
 
 def main():
@@ -251,10 +238,12 @@ def main():
         return
 
     all_child_content = get_child_pages(pages=pages, extractor=extractor, search_query=search_query)
-
+    nbr = 1
     for child_content in all_child_content:
         if (child_content["content"] != ""):
+            print(f"Conversion du texte {nbr} sur {len(all_child_content)}")
             use_appolo(child_content)
+            nbr = nbr + 1 
         else :
             print("\nPas de texte à convertir.")
 
