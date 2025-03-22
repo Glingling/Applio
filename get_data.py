@@ -200,6 +200,7 @@ def get_child_pages(pages, extractor, search_query):
         for child in child_pages:
             content = extractor.get_page_content(child["id"])
             lignes = content.split("\n")
+            print(lignes[-1])
             lignes.pop()
             content = ""
             for i in range(len(lignes)):
